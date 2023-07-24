@@ -1,0 +1,692 @@
+---
+title: "Partie 1"
+author: "Samuel AYANOU"
+date: "`r Sys.Date()`"
+format: docx
+editor: visual
+output:
+  word_document:
+    toc: yes
+    toc_depth: '6'
+    df_print: paged
+---
+
+
+```{r setup, include=TRUE}
+
+```
+
+\includepdf {pagedegardeSamuel.pdf}
+
+
+# Introduction
+
+Dans la suite de notre travail il serait l'objet de repondre aux différentes questions qui nous sont posées.
+
+# Description des données
+
+Dans cette partie nous importerons les données , la mise en forme de ces données et la création de variables qui seront utilisées tout au long de notre travail
+
+## Importation et mise en forme
+
+-   importation de la base de données dans un objet de type data.frame nommé projet
+
+```{r }
+# importation de la base Base_Partie1.xlsx 
+
+
+library(readxl)
+library(janitor)
+Base <- read_excel("Base_Partie 1.xlsx")
+projet <- as.data.frame(Base)
+
+
+```
+
+-   tableau qui resume les valeurs manquantes
+
+```{r echo=TRUE, results='hide'}
+# je veux connaitre les variables manquantes dans un tableau 
+# ce code vérifie pour chaque colonne les valeur manquante
+
+
+
+
+# library a rechargé
+
+library(dplyr)
+library(stats)
+library(base)
+ 
+# selection des variables
+
+projet <- projet |> select(everything()) ## pour sélectionner les variables : toutes
+variables <- names(projet)
+
+library(flextable)
+library(knitr)
+
+```
+
+-   on continue
+
+```{r }
+
+
+
+na_var_eff <- colSums(is.na(projet))
+na_var_pct <- colSums(is.na(projet)* 100/nrow(projet))
+
+## Créer un tableau récapitulatif des valeurs manquantes
+na_var <- base::data.frame(Variables = variables, Effectifs = na_var_eff,
+                           Pourcentage = na_var_pct)
+## Afficher les résultats
+
+
+flextable(na_var) %>% bold(part = "header")
+
+
+
+```
+
+-   verification des valeurs manquantes pour la variable key dans la base projet
+
+```{r }
+
+# valeur manquante key
+
+valeurs_manquantes <- projet[is.na(projet$key) ]
+
+
+# Afficher les PME concernées
+
+if (nrow(valeurs_manquantes) > 0) {
+  pme_concernees <- unique(valeurs_manquantes$PME)
+  print(pme_concernees)
+} else {
+  print("Aucune valeur manquante pour la variable 'key'")
+  
+}
+
+
+
+```
+
+## Création de variables
+
+-   je renomme la variable q1 en région
+
+```{r}
+# je vais utiliser la fonction rename_data.frame de dplyr 
+
+
+library(dplyr)
+# je renomme q1 en region q2 en departement, q23 en sexe en créant un nouveau data.frame projet_renom
+
+
+projet_renom <- dplyr:::rename.data.frame(projet, region = q1, departement=q2, sexe=q23)
+
+
+
+
+
+
+
+```
+
+-   créons maintenant la variable **sexe_2** qui vaut **1** si **sexe égale à Femme** et **0** sinon.
+
+```{r  }
+# alors 1 si le sexe est femme et 0 sinon avec la fonction ifelse
+projet_renom$sexe_2<- ifelse(projet_renom$sexe == "Femme", 1, 0)
+
+```
+
+-   je crée un **data.frame** nommé **langues** qui prend les variables **key** et les variables correspondantes décrites plus haut
+
+```{r echo=TRUE}
+# avec ma fonction select je crée un data.frame en choississant comme variable key et tous les variable començant par q24a_
+
+langue <- dplyr::select(projet,key, starts_with("q24a_"))
+langues<- as.data.frame(langue)
+
+
+```
+
+-   je crée une variable **parle** qui est égale au nombre de langue parlée par le dirigeant de la PME.
+
+```{r echo=TRUE, results='hide'}
+#je fais le calcul par ligne pour connaitre le nombre de langue parlé par le responsable identifié a travers la clé de la société 
+
+langues<- janitor::adorn_totals(langues,where="col")
+langues <- dplyr:::rename.data.frame(langues, parle = Total)
+langues
+```
+
+-   je sélectionne uniquement les variables **key** et **parle**, l'objet de retour sera **langues**.
+
+```{r  echo=TRUE, results='hide'}
+# avec la fonction select je règle mon problème
+langues<- dplyr::select(langues,key, parle)
+langues <- as.data.frame(langues)
+
+```
+
+-   avec merge on est content
+
+```{r  echo=TRUE, results='hide'}
+# Fusion des dataframes projet et langues avec merge 
+projet_merge <-  merge(projet, langues, by = "key")
+
+
+```
+
+# Analyses descriptives
+
+ouf l'analyse descriptive
+
+```{r echo=TRUE, results='hide'}
+# appel au package gtsummary
+
+library(gtsummary)
+
+library(dplyr)
+
+
+```
+
+## creation de tableau
+
+### repartition des PME suivant le sexe du responsable
+
+```{r echo=TRUE, results='hide'}
+# la fonction tbl_summary nous vient en aide en selectionnant la variable q23 
+
+
+t_sexe <-  projet_merge[c("q23")] %>%
+  tbl_summary( 
+    label = (q23 ~ " repartition des PME selon le sexe de leur responsable")
+    
+  )  %>%
+  bold_labels() %>%
+  italicize_labels()
+
+ t_sexe 
+
+```
+
+### repartition selon le niveau d'instruction
+
+```{r echo=TRUE, results='hide'}
+# de même que precedamment , mais cette fois avec 
+
+t_instruction <-  projet_merge[c("q25")] %>%
+  tbl_summary( 
+    label = (q25 ~ " repartition des responsables des PME selon le niveau d'instruction")
+    
+  )  %>%
+  bold_labels() %>%
+  italicize_labels()
+t_instruction
+
+```
+
+### repartition des PME selon le statut juridique
+
+```{r echo=TRUE, results='hide'}
+# que faire sans tbl_summary ? je l'applique a q12
+
+
+t_juridique <-  projet_merge[c("q12")] %>%
+  tbl_summary( 
+    label = (q12 ~ " repartition des PME selon leur statut juridique")
+    
+  )  %>%
+  bold_labels() %>%
+  italicize_labels()
+t_juridique
+
+```
+
+### repartition des PME selon que cela soit dirige par un proprietaire/ locataire
+
+```{r echo=TRUE, results='hide'}
+# que faire sans tbl_summary ? je l'applique a q81
+
+
+t_loc <-  projet_merge[c("q81")] %>%
+  tbl_summary( 
+    label = (q81 ~ " repartition des PME selon leur proprietaire/locataire")
+    
+  )  %>%
+  bold_labels() %>%
+  italicize_labels()
+t_loc
+```
+
+### repartition des PME selon le sexe et le niveau d'instruction des responsables
+
+```{r eval=FALSE}
+
+# Create the contingency table with percentages calculated along columns
+t_sexe_ins <- projet %>%
+  tbl_cross(
+    row = q25,
+    col = q23,
+    percent = "column",
+    label = list(q23 ~ "Répartition des PME selon le sexe de leur responsable",
+                 q25 ~ "Répartition des responsables des PME selon le niveau d'instruction")
+  ) %>%
+  add_p(source_note = TRUE)
+
+# afficher la table
+t_sexe_ins
+
+
+```
+
+### alors faisons la repartition des statuts juridiques et le sexe
+
+```{r echo=TRUE, results='hide'}
+t_sexe_jur <- projet_merge %>%
+  tbl_cross(
+    row= q12,
+    col=q23,
+    percent = "column",
+    label = list(q23 ~ " repartition des PME selon le sexe de leur responsable" , q12 ~ " repartition des responsables des PME selon le statut juridique")
+    
+  ) %>%
+  add_p(source_note = TRUE)
+t_sexe_jur 
+```
+
+### Tableau general
+
+```{r echo=TRUE}
+
+library(gtsummary)
+# Et si je faisait un tableau ou je combine tous ?
+table_gene <- projet_merge %>% 
+  tbl_summary(
+    include = c(q12, q25, q81, q23), # différentes variables à inclure dans le tableau
+    by = q23, # regroupement par sexe
+    label = list(
+      q23 ~ "Répartition des PME selon le sexe de leur responsable",
+      q12 ~ "Répartition des responsables des PME selon le statut juridique",
+      q81 ~ "Répartition des PME selon leur propriétaire/locataire",
+      q25 ~ "Répartition des responsables des PME selon le niveau d'instruction"
+    )
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels() %>%
+ gtsummary:: modify_header(
+    label = "__variable__",
+    
+    stat_1 = "**Femme**, N = 191",
+    
+    stat_2 = "**Homme**, N = 59"
+) %>%gtsummary::as_flex_table()
+
+set_gtsummary_theme(theme_gtsummary_compact()) # appliquer un theme 
+
+theme_gtsummary_journal(set_theme = FALSE) %>% print()
+
+theme_gtsummary_journal(
+  journal = c("jama", "lancet", "nejm", "qjecon"),
+  set_theme = TRUE
+  
+)
+
+table_gene
+# j'ai quelque chose de magnifique 
+
+```
+
+### A notre imagination
+
+-   Analyse par filiere
+
+``` {recho="TRUE," results="hide"}
+# une fonction plus simple 
+table<- function(bases, groupes, labell, includes){
+  t<-bases %>% 
+  tbl_summary(
+    include = includes, 
+    by = groupes,
+    percent="col",
+    label = labell
+      
+    
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>%
+  modify_header(
+    label = "__variable__",
+    stat_1 = "**non**, ({n}/{N})",
+    stat_2 = "**oui**, ({n}/{N})"
+    
+    
+    
+  )
+  return(t)
+}
+```
+
+-   filière 1
+
+```{r echo=TRUE, results='hide'}
+# que dire sur les filieres ? 
+
+# nous allons produire 4 tableau puis les fusionner 
+
+#  le 1e tableau presente les statistiques sur le sexe des responsable , le statut juridique,le proprietaire,le niveau d instruction , tous en fonction de fliere_2
+t_fil_1<-projet_merge %>% 
+  
+  tbl_summary(
+    
+    include = c("q1", "q25", "q81", "q2", 'filiere_1', 'q8' ), # différentes variables à inclure dans le tableau
+    by = "filiere_1", # regroupement par sexe
+    percent="col",
+    label = list(
+      q2 ~ "Répartition des PME selon le departement",
+      q1 ~ "Répartition des PME selon la region ",
+      q81 ~ "Répartition des PME selon leur propriétaire/locataire",
+      q25 ~ "Répartition des responsables des PME selon le niveau d'instruction",
+      filiere_1 ~ " filiere arachide ",
+      q8 ~ "  activite principale de l' entreprise "
+      
+      
+    )
+  ) %>%
+  
+    
+ bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>% modify_header(
+    label = "__variable__",
+    stat_1 = "**non**, ({n}/{N})",
+    stat_2 = "**oui**, ({n}/{N})" )
+
+
+t_fil_1
+
+
+```
+
+-   ce tableau ressort sur la filiere 2
+
+```{r echo=TRUE, message=FALSE}
+t_fil_2<-projet_merge %>% 
+  tbl_summary(
+    include = c("q1", "q25", "q81", "q2", 'filiere_2', 'q8' ), # différentes variables à inclure dans le tableau
+    by = "filiere_2", # regroupement par sexe
+    percent="col",
+    label = list(
+      q2 ~ "Répartition des PME selon le departement ",
+      q1 ~ "Répartition des PME selon la region",
+      q81 ~ "Répartition des PME selon leur propriétaire/locataire",
+      q25 ~ "Répartition des responsables des PME selon le niveau d'instruction",
+      filiere_2 ~ " filiere anacarde ",
+      q8 ~ "  activite principale de l' entreprise "
+      
+      
+      
+    )
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>% modify_header(
+    label = "__variable__",
+    stat_1 = "**non**, ({n}/{N})",
+    stat_2 = "**oui**, ({n}/{N})" )
+
+
+t_fil_2
+
+    
+    
+
+
+```
+
+ceci porte sur la filiere 3
+
+```{r echo=TRUE, message=FALSE}
+ # avec la filiere 3
+t_fil_3<-projet_merge %>% 
+  tbl_summary(
+    include = c("q1", "q25", "q81", "q2", 'filiere_3','q8' ), # différentes variables à inclure dans le tableau
+    by = "filiere_3", # regroupement par sexe
+    percent="col",
+    label = list(
+      q2 ~ "Répartition des PME selon le departememt",
+      q1~ "Répartition des PME selon la region",
+      q81 ~ "Répartition des PME selon leur propriétaire/locataire",
+      q25 ~ "Répartition des responsables des PME selon le niveau d'instruction",
+      filiere_3 ~ " filiere mangue ",
+      q8 ~ "  activite principale de l' entreprise "
+      
+      
+    )
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>%
+  modify_header(
+    label = "__variable__",
+     stat_1 = "**non**, ({n}/{N})",
+    stat_2 = "**oui**, ({n}/{N})"
+    
+   
+    
+    
+) 
+
+
+t_fil_3
+
+
+```
+
+-   ce tableau porte sur la filiere 4
+
+```{r echo=TRUE, message=FALSE}
+#filiere 4
+t_fil_4<-projet_merge %>% 
+  tbl_summary(
+    include = c("q2", "q25", "q81", "q1", 'filiere_4', 'q8' ), # différentes variables à inclure dans le tableau
+    by = "filiere_4", # regroupement par sexe
+    percent="col",
+    label = list(
+      q2 ~ "Répartition des PME selon le departement ",
+      q1 ~ "Répartition des PME selon la region ",
+      q81 ~ "Répartition des PME selon leur propriétaire/locataire",
+      q25 ~ "Répartition des responsables des PME selon le niveau d'instruction",
+      filiere_4 ~ " filiere riz",
+      q8 ~ "  activite principale de l' entreprise "
+      
+      
+    )
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>%
+  modify_header(
+    label = "__variable__",
+     stat_1 = "**non**, ({n}/{N})",
+    stat_2 = "**oui**, ({n}/{N})"
+   
+    
+    
+)
+
+t_fil_4
+
+```
+
+-   mergeons ce petit tableau
+
+```{r echo=TRUE, results='hide'}
+# tableau general avec merge 
+table_1 <-
+  tbl_merge(
+    tbls = list(t_fil_1,t_fil_2,t_fil_3,t_fil_4),
+    tab_spanner=c("**la filière arachide**", "**la filière anacarde**","**la filière mangue**","**la filière riz**")) %>% as_flex_table()
+
+set_gtsummary_theme(theme_gtsummary_compact()) # appliquer un theme 
+theme_gtsummary_journal(set_theme = FALSE) %>% print()
+theme_gtsummary_journal(
+  journal = c("jama", "lancet", "nejm", "qjecon"),
+  set_theme = TRUE)
+
+
+
+
+```
+
+```{r}
+# afficher
+table_1
+```
+
+### croisement avec date
+
+```{r echo=TRUE, results='hide'}
+
+library(lubridate)
+library(dplyr)
+
+# duree de l enregistrement 
+projet_mod <- projet_merge  %>% mutate( duree_enquete= as.numeric(interval(	start,submissiondate) %>% as.duration()))
+
+projet_mod_2 <- projet_merge  %>% mutate( duree_enquete= (interval(	start,submissiondate) %>% as.duration()))
+projet_mod_2 # temps en semaine 
+
+
+projet_mod$duree_enquetes <- projet_mod$duree_enquete/86400 # temps en jours 
+projet_mod
+
+```
+
+-   recoder la variable date_enquete
+
+```{r echo=TRUE, results='hide'}
+ # je renomme la variable date pour ceer les statistique 
+# creer un intervalle 
+intervalle <- c(0,1,10,Inf)
+
+projet_mod$duree <- cut(projet_mod$duree_enquetes, breaks = intervalle, labels = c("inferieur a 1 jour", "entre 1 et 10 jours", "Plus de 10"))
+projet_mod
+```
+
+-   statistiques descriptives en utilisant les durées d'interview
+
+```{r echo=TRUE}
+
+
+table_date<-projet_mod %>% 
+  tbl_summary(
+    include = c("q1", "q2", "duree", "q12", "q16", "q19", "q17"), # différentes variables à inclure dans le tableau
+    by = "duree", # regroupement par sexe
+    percent="col",
+    label = list( q2 ~ "Répartition des PME selon le departement ",
+                                                q1 ~ "Répartition des PME selon la region ", q12 ~ "Répartition des responsables des PME selon le statut juridique", 	q16 ~ "L’entreprise est-elle désservie par une route bitumée ? ", q17 ~ "Etat de la route bitumée",
+                                                q19 ~ "repartition des PME suivant l'etat de la piste qui mene a l'entreprise", duree~ "durre des enquete en annee"
+      
+      
+    )
+  ) %>%
+  bold_labels() %>% # ajout des styles aux libellés
+  italicize_labels()%>%
+  modify_header(
+    label = "__variable/ duree de l'enqête__",
+     stat_1 = "**inferieur a un jour **, ({n}/{N})",
+    stat_2 = "**entre 1 et 10 jours**, ({n}/{N})",
+    stat_3 = "**plus de 10 jours**, ({n}/{N})"
+   
+    
+    
+)%>% as_flex_table() 
+
+table_date
+
+```
+
+# allons faire de la cartographie
+
+## importation des données
+
+```{r echo=TRUE, results='hide'}
+
+library(ggplot2)
+library(sf)
+library(st)
+```
+
+## transformation des données en données géographiques
+
+```{r echo=TRUE, results='hide'}
+# mes donnees deviennet des donnees geographique
+senegal <- st_read("gadm41_SEN_shp/gadm41_SEN_1.shp")
+projet_map <- st_as_sf(projet,coords=c("gps_menlongitude", "gps_menlatitude"), crs= st_crs(senegal))
+projet_map <- st_join(projet_map,senegal)
+projet_map
+
+
+
+```
+
+## je fais la représentation spatiale des PME suivant le sexe
+
+```{r echo=TRUE}
+
+
+# pourquoi pas  une réprésentation spatiale des PME suivant le sexe ?
+
+ggplot(projet)+geom_sf(data=senegal)+geom_point(aes(x=gps_menlongitude, y=gps_menlatitude, color= q23))+ labs (title= "réprésentation spatiale des PME suivant le sexe", x="gps_menlongitude", y="gps_menlatitude" )+ theme_classic()
+```
+
+## la réprésentation spatiale des PME suivant le niveau d' education
+
+```{r echo=TRUE}
+# pourquoi pas  une réprésentation spatiale des PME suivant le niveau d' education  ?
+
+ggplot(projet)+geom_sf(data=senegal)+geom_point(aes(x=gps_menlongitude, y=gps_menlatitude, color= q25))+ labs (title= "réprésentation spatiale des PME suivant le niveau d'education ", x="gps_menlongitude", y="gps_menlatitude" )+ theme_classic()
+```
+
+## Une réprésentation spatiale des PME suivant le niveau d'instruction
+
+```{r echo=TRUE}
+# allons faire une réprésentation spatiale des PME suivant le niveau d’instruction
+
+
+ggplot(projet)+geom_sf(data=senegal)+geom_point(aes(x=gps_menlongitude, y=gps_menlatitude, color= q12))+ labs (title= "réprésentation spatiale des PME suivant le niveau d'education ", x="gps_menlongitude", y="gps_menlatitude" )+ theme_classic()
+
+```
+
+## analyse spatiale de votre choix
+
+```{r echo=TRUE}
+# représentation spatiale des PME selon propriétaire ou locataire et Nombre d’années d’experience professionnelle du dirigeant/responsable de la PME dans l’entreprise
+
+
+
+ggplot(data = projet) +
+  # Spatial representation of Senegal
+  geom_sf(data = senegal) +
+  
+  # Plot points pour 
+  geom_point(aes(x = gps_menlongitude, y = gps_menlatitude, color = q81, shape = q26)) +
+  
+  # Customize plot labels and titles
+  labs(title = "representation spatiale",
+       x = "Longitude",
+       y = "Latitude",
+       color = "Education Level",
+       shape = "Years of Professional Experience") +
+  
+  # Use continuous scales for color and shape mappings
+  scale_color_discrete(name = "Education Level") +
+  scale_shape_binned(name = "Years of Experience") +
+  
+  # Apply a classic theme for the plot
+  theme_classic()
+
+
+```

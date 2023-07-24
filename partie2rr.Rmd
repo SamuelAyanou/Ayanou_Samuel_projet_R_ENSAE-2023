@@ -1,0 +1,327 @@
+
+---
+title: "Partie 2"
+author: "Samuel Ayanou"
+date: aujourd'hui c'est le `r format(Sys.Date(), "%Y-%m-%d")`.
+format: docx
+editor: visual
+output:
+  word_document: 
+    number_sections: yes
+    fig_caption: yes
+    toc: yes
+header-includes:
+      - \usepackage{pdfpages}
+      - \ usepackage{graphicx}
+---
+
+```{r setup, include=TRUE}
+
+```
+
+\includepdf {pagedegardeSamuel.pdf}
+
+
+# Partie 2
+
+
+
+# Nettoyage et gestion des données
+
+
+
+## je Renomme la variable "country_destination" en "destination" et je défini les valeurs négatives comme manquantes.
+
+
+
+-   importation de la base
+
+```{r}
+
+library(readxl)
+library(dplyr)
+Base_Partie_2 <- read_excel("Base_Partie 2.xlsx", 
+    sheet = "data")
+
+```
+
+
+\includepdf {pagedegardeSamuel.pdf}
+
+-   je renomme la country_destination en destination
+
+```{r}
+base_Partie_21 <- dplyr:: rename(Base_Partie_2,destination= country_destination)
+
+
+```
+
+-   modifions nos valeurs negative en valeurs manquantes
+
+```{r}
+
+# les valeurs manquantes sont des NA
+base_Partie_21$destination <- ifelse(base_Partie_21$destination < 0, NA, base_Partie_21$destination)
+
+  
+```
+
+-   je cree une nouvelle variable contenant des tranches d'âge de 5 ans en utilisant la variable "age".
+
+```{r}
+# je cree des intervalles 
+intervalle <- c(10,15,20,25,30,35,40,45,50,Inf)
+# et je decoupe mon intervalle 
+
+
+base_Partie_21$age_nouv <- cut(base_Partie_21$age, breaks = intervalle, labels = c("entre 10 et 15", "entre 15 et 20 ans","entre 20 et 25 ans", "entre 25 et 30 ans", "entre 30 et 35 ans", "entre 35 et 40 ans", "entre 40 et 45 ans", "entre 45 et 50 ans","Plus de 50 ans"))
+
+```
+
+-   nous Créons une nouvelle variable contenant le nombre d'entretiens réalisés par chaque agent recenseur
+
+```{r}
+# avec group_by et mutate je resoud le problem
+base_Partie_22 <- base_Partie_21 %>% group_by(enumerator) %>% mutate(nombre_entretiens = n())
+
+```
+
+-   je Crée une nouvelle variable qui affecte aléatoirement chaque répondant à un groupe de traitement (1) ou de controle (0).
+
+```{r}
+ #Set a random seed for reproducibility (optional but recommended)
+set.seed(123)
+
+# Number of respondents in the base_partie_22
+num_respondents <- nrow(base_Partie_22)
+
+# Generate a vector of 0s and 1s, representing control and treatment groups respectively, with an equal probability (50% each).
+group_assignment <- sample(c(0, 1), size = num_respondents, replace = TRUE)
+
+# Add the 'group' variable to the data frame base_partie_22
+base_Partie_22$group <- group_assignment
+```
+
+-   Fusion
+
+```{r}
+# j' appelle la deuxieme feuille 
+
+Base_Partie_2B <- read_excel("Base_Partie 2.xlsx", 
+    sheet = "district")
+
+
+# mergeons
+base_merger <- merge(base_Partie_22, Base_Partie_2B, by = "district", all.x = TRUE)
+
+```
+
+Calculons la durée de l'entretien
+
+```{r}
+
+#install.packages(lubridate)
+library(lubridate)
+library(dplyr)
+library(gtsummary)
+
+# duree de l'enquete
+
+base_mergere <- base_merger  %>% mutate( duree_enquete= interval(starttime
+,endtime
+) %>% as.duration())
+
+```
+
+-   duree moyenne par enqueteur
+
+```{r}
+base_merg <- base_mergere %>%
+  group_by(enumerator) %>%
+  summarize(duree_moyenne_en_seconde = mean(duree_enquete, na.rm = TRUE))
+
+#install.packages("gt")
+library(gt)
+# affiche la durre moyenne en seconde sous une table 
+tables <- gt(base_merg)
+tables
+
+# sortons une base complet avec ces donnees 
+
+base_fin <- merge(base_merg,base_mergere, by="enumerator", all.x= TRUE)
+
+```
+
+-   je renomme toutes les variables de l'ensemble de données en ajoutant le préfixe "endline\_" à l'aide d'une boucle.
+
+```{r}
+
+
+# Convertissons le data frame en une  matrice
+base_fin_matrix <- as.matrix(base_fin)
+
+# Creons une  fonction pour ajouter le prefixe "endline_" 
+renomme_function <- function(x) {
+  return(paste0("endline_", x))
+}
+
+#  appelons Apply 
+new_column <- apply(base_fin_matrix, 2, renomme_function)
+
+
+# recuperons le nom des colonnes du data frame courant 
+ancienne_col <- names(base_fin)
+
+# changeons les noms 
+new_column <- renomme_function(ancienne_col)
+
+# alors renommons 
+names(base_fin) <- new_column
+
+
+# Now all variables in the data frame have been renamed with the prefix "endline_".
+
+```
+
+# Analyse et visualisation des donnees
+
+-   Créez un tableau récapitulatif contenant l'âge moyen et le nombre moyen d'enfants par district
+
+```{r}
+
+# creons le tableau
+tableau_resum <- gt( base_fin %>%
+  group_by(endline_district) %>%
+  summarise(age_moyenne = mean(endline_age),
+            nbre_moyen_denfant = mean(endline_children_num
+)))
+
+# ce tableau sort les resultats tels sans approximation 
+
+styled_tablef <- tableau_resum %>%
+  tab_header(title = " tableau resume") %>%
+  tab_style(style = list(cell_text(weight = "bold")),
+            locations = cells_column_labels(columns = everything())) %>% tab_header(title = "Summary Table") %>%
+  tab_style(style = list(cell_text(weight = "bold")),
+            locations = cells_column_labels(columns = everything()))
+styled_tablef
+
+
+
+
+```
+
+-   arrondir les données telles que les donnees en entier , si la partie decimale depasse 0.5 on passe a l entier superieur sinon a l entier inférieur
+
+```{r}
+# ce tableau sort des donnees en entier , si la partie decimale depasse 0.5 on passe a l entier superieur sinon a l entier inférieur
+styled_table <- tableau_resum %>%
+  tab_header(title = "Summary Table avec les valeurs arrondies") %>%
+  fmt_integer(columns = c("age_moyenne", "nbre_moyen_denfant")) %>%
+  tab_style(style = list(cell_text(weight = "bold")),
+            locations = cells_column_labels(columns = everything()))
+
+ styled_table
+```
+
+## le test p value
+
+```{r}
+
+# la fonction t_test nous permet de	Testez si la différence d’âge entre les sexes est statistiquement significative au niveau de 5 %.
+t_test_resultat <- t.test(endline_age ~ endline_sex, data = base_fin)
+
+# affichons le resultat du t-test 
+t_test_resultat
+
+```
+
+## resultat
+
+```         
+    Welch Two Sample t-test  data:  endline_age by endline_sex t = -0.95493, df = 10.001, p-value = 0.3621 alternative hypothesis: true difference in means between group 0 and group 1 is not equal to 0 95 percent confidence interval:  -282.7605  113.1009 sample estimates: mean in group 0 mean in group 1         25.98837       110.81818 
+```
+
+-   Créons une base imputée de sa valeur aberrante , ainsi on remplacera les valeurs aberrantes par la médiane
+
+```{r}
+library(dplyr)
+base_imputer <- base_fin %>% mutate(endline_age=ifelse(endline_age <0 | endline_age >120, median(base_fin$endline_age, na.rm=TRUE),endline_age))
+
+
+
+
+```
+
+-   Créons un nuage de points de l'âge en fonction du nombre d'enfants
+
+```{r}
+library(ggplot2)
+# imputons la base enfin de remplacer la valeur aberrante 
+# Create the scatter plot
+
+nuage <- ggplot(data = base_imputer, aes(x = endline_children_num, y = endline_age)) +
+  geom_point() +
+  labs(x = "Nombre d'enfant", y = "Age",
+       title = "nuage de point  de l’âge en fonction du nombre d’enfants")
+
+# afficher
+nuage
+
+
+```
+
+-   l'effet d'appartenance
+
+```{r}
+ 
+# faisons une regression logistique car les variables est l'une categorielle et l'autre categorielle numerique 
+# Charger les packages nécessaires
+library(gtsummary)
+
+# Effectuer la régression logistique
+logistic_model <- glm( endline_group~endline_intention, data = base_fin, family = binomial)
+
+# Créer un tableau de résumé des résultats
+logistic_table <- tbl_regression(logistic_model)
+
+# Afficher le tableau de résumé des résultats
+logistic_table
+
+
+
+```
+
+## Créons un tableau de régression avec 3 modèles.
+
+```{r echo=TRUE, message=FALSE}
+# Chargez les bibliothèques requises (si ce n'est pas déjà fait)
+library(dplyr)
+library(broom)
+
+
+
+# Supposons que vous avez un data frame nommé "data" avec les colonnes : "intention", "group", "age", "sex", et "district".
+
+# Modèle A : Modèle vide (Effet du traitement sur les intentions)
+modele_A <- lm(endline_intention ~ endline_group, data = base_fin) %>% tbl_regression()
+
+# Modèle B : Effet du traitement sur les intentions en tenant compte de l'âge et du sexe
+modele_B <- lm(endline_intention ~ endline_group + endline_age + endline_sex, data = base_fin)%>% tbl_regression()
+
+# Modèle C : Identique au modèle B, mais en contrôlant le district
+modele_C <- lm(endline_intention ~ endline_group + endline_age + endline_sex + endline_district, data = base_fin)%>% tbl_regression()
+# creeons le tableau
+
+a <-gtsummary::tbl_stack( list(modele_A ,modele_B,modele_C),
+group_header =  c("Modèle A (Vide)", "Modèle B (Age et Sexe)", "Modèle C (Age, Sexe et District)")
+  
+)
+#afficher le tableau
+a
+
+
+
+
+
+```
